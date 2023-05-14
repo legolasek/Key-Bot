@@ -2,6 +2,9 @@
 # Key-Bot
 Key-Bot jest narzędziem, które automatycznie dołącza do darmowych bitew na key-drop.com za Ciebie. Dzięki temu zaoszczędzisz czas i zwiększysz swoje szanse na wygranie cennych nagród. Kod źródłowy Key-Bot jest otwarty i dostępny publicznie, co oznacza, że możesz być pewien jego bezpieczeństwa.
 
+![image](https://github.com/legolasek/Key-Bot/assets/26514789/87314199-c08a-4553-91c8-3cf15ed73d32)
+
+
 # Instalacja
 Aby zainstalować Key-Bot, wykonaj poniższe kroki:
 
