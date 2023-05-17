@@ -1,13 +1,22 @@
-import json, os, requests, logging, yaml, re, colorer
+import json
+import os
+import requests
+import logging
+import yaml
 from time import sleep
 from datetime import timedelta
 from yaml import SafeLoader
 from fake_useragent import UserAgent
 from pystyle import Colors, Colorate, Center
+import tkinter as tk
+from PIL import ImageTk, Image
+import webbrowser
+import threading
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget, QTextEdit
+from PyQt5.QtGui import QPixmap, QColor, QPalette
 
 # Logo.
 logo = """
-
 ██╗  ██╗███████╗██╗   ██╗     ██████╗  ██████╗ ████████╗
 ██║ ██╔╝██╔════╝╚██╗ ██╔╝     ██╔══██╗██╔═══██╗╚══██╔══╝
 █████╔╝ █████╗   ╚████╔╝█████╗██████╔╝██║   ██║   ██║   
@@ -33,7 +42,6 @@ os.system(f"title Keydrop Battle Bot - discord.gg/zV6MQQqkFV")
 
 class Config():
     def __init__(self):
-
         if not os.path.exists("konfig.yaml"):
             logging.error("Nie znaleziono pliku konfiguracyjnego! Tworze go dla ciebie...")
             with open("konfig.yaml", "w") as file:
@@ -52,8 +60,8 @@ class Config():
 configData = Config()
 
 class CaseBattle:
-    # Initialize the class.
     def __init__(self, token, sleep_interval=configData.sleep_interval, ticket_cost_threshold=configData.ticket_cost_threshold):
+        self.running = False  # Dodajemy flagę "running" do oznaczania działania bota
         self.session = requests.Session()
         self.user_agent = UserAgent()
         self.session.headers.update({
@@ -76,7 +84,7 @@ class CaseBattle:
     # Function to print the logo.
     def print_logo(self):
         print(Center.XCenter(Colorate.Vertical(Colors.yellow_to_red, logo, 1)))
-        print(Center.XCenter(Colorate.Vertical(Colors.yellow_to_red, "Wersja 0.1.1", 1)))
+        print(Center.XCenter(Colorate.Vertical(Colors.yellow_to_red, "Wersja 0.1.2", 1)))
         print(Center.XCenter(Colorate.Vertical(Colors.yellow_to_red, "────────────────────────────────────────────\n", 1)))
         print(Center.XCenter(Colorate.Vertical(Colors.yellow_to_red, "Szukanie bitwy...", 1)))
 
@@ -123,13 +131,15 @@ class CaseBattle:
     def monitor_battles(self):
         clear()
         self.print_logo()
-        while True:
+        self.running = True  # Ustawiamy flagę "running" na True
+        while self.running:  # Modyfikujemy pętlę, aby działała tylko gdy "running" jest True
+            # Pozostała część kodu
             battles = self.get_active_battles()
             for battle in battles:
                 if self.is_joinable(battle):
-                    print (Colorate.Vertical(Colors.yellow_to_red, f"\n─────────────────[ {battle['id']} ]─────────────────\n\n", 1))
+                    print(Colorate.Vertical(Colors.yellow_to_red, f"\n─────────────────[ {battle['id']} ]─────────────────\n\n", 1))
                     logging.info(f"proba dolaczenia do bitwy {battle['id']}...")
-                    print (Colorate.Horizontal(Colors.yellow_to_green, f"ID bitwy: {battle['id']}\n", 1))
+                    print(Colorate.Horizontal(Colors.yellow_to_green, f"ID bitwy: {battle['id']}\n", 1))
                     success, message = self.join_battle(battle["id"])
                     if success:
                         logging.info(f"Udalo sie dolaczyc do bitwy!")
@@ -148,7 +158,9 @@ class CaseBattle:
                         sleep(self.sleep_interval)
             sleep(self.sleep_interval)
 
-    # Function to check if a battle is joinable.
+    def stop_monitoring(self):
+        self.running = False  # Ustawiamy flagę "running" na False, aby zatrzymać wyszukiwanie bitew
+        # Function to check if a battle is joinable.
     def is_joinable(self, battle):
         isFreeBattle = battle["isFreeBattle"]
         users = battle["users"]
@@ -158,10 +170,83 @@ class CaseBattle:
                 return False
             elif battle["freeBattleTicketCost"] < self.ticket_cost_threshold:
                 return True
-        return False
+            return False
 
-# Start the script.
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    cb = CaseBattle(configData.bearer_token)
-    cb.monitor_battles()
+# GUI UPDATE
+class GUI:
+    def __init__(self):
+        self.window = tk.Tk()
+        self.window.title("Keydrop Battle Bot")
+        self.window.geometry("400x600")
+        self.case_battle = None
+
+        # Logo
+        logo_path = "logo.png"
+        if os.path.exists(logo_path):
+            self.logo_image = ImageTk.PhotoImage(Image.open(logo_path))
+            self.logo_label = tk.Label(self.window, image=self.logo_image)
+            self.logo_label.pack()
+
+        # Token label and entry
+        self.token_label = tk.Label(self.window, text="Bearer Token:")
+        self.token_label.pack()
+        self.token_entry = tk.Entry(self.window, width=40)
+        self.token_entry.pack()
+
+        # Start button
+        self.start_button = tk.Button(self.window, text="Start", command=self.start_bot)
+        self.start_button.pack()
+
+        # Stop button
+        self.stop_button = tk.Button(self.window, text="Stop", command=self.stop_bot, state=tk.DISABLED)
+        self.stop_button.pack()
+
+        # Exit button
+        self.exit_button = tk.Button(self.window, text="Wyjście", command=self.exit_program)
+        self.exit_button.pack()
+
+        # Footer label
+        self.footer_label = tk.Label(self.window, text="Created By PSteczka", fg="blue", cursor="hand2")
+        self.footer_label.pack()
+        self.footer_label.bind("<Button-1>", lambda e: self.open_github_repo())
+
+    def start_bot(self):
+        bearer_token = self.token_entry.get().strip()
+        if bearer_token:
+            self.start_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
+            self.token_entry.config(state=tk.DISABLED)
+            self.case_battle = CaseBattle(bearer_token)
+
+        # Uruchomienie monitorowania bitwy w osobnym wątku
+            monitor_thread = threading.Thread(target=self.start_monitoring, args=(bearer_token,))
+            monitor_thread.start()
+        else:
+            logging.error("Bearer Token cannot be empty!")
+
+    def start_monitoring(self, bearer_token):
+        self.case_battle.monitor_battles()
+
+    def stop_bot(self):
+        self.start_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+        self.token_entry.config(state=tk.NORMAL)
+
+        # Zatrzymywanie monitorowania bitew
+        if self.case_battle is not None:  # Sprawdź, czy case_battle zostało zainicjalizowane
+            self.case_battle.stop_monitoring()
+
+    def exit_program(self):
+        self.stop_bot()
+        self.window.quit()
+
+    def open_github_repo(self):
+        webbrowser.open("https://github.com/pstezynski/keydrop-battle-bot")
+
+    def run(self):
+        self.window.mainloop()
+
+# Start the GUI
+gui = GUI()
+gui.run()
+
