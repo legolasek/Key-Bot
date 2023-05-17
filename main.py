@@ -241,7 +241,7 @@ class GUI:
         self.window.quit()
 
     def open_github_repo(self):
-        webbrowser.open("https://github.com/pstezynski/keydrop-battle-bot")
+        webbrowser.open("https://github.com/legolasek/Key-Bot")
 
     def run(self):
         self.window.mainloop()
