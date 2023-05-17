@@ -177,7 +177,7 @@ class GUI:
     def __init__(self):
         self.window = tk.Tk()
         self.window.title("Keydrop Battle Bot")
-        self.window.geometry("400x600")
+        self.window.geometry("500x650")
         self.case_battle = None
 
         # Logo
