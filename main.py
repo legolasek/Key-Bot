@@ -1,29 +1,27 @@
+import sys
 import json
 import os
 import requests
 import logging
 import yaml
 from time import sleep
+from datetime import datetime
 from datetime import timedelta
 from yaml import SafeLoader
 from fake_useragent import UserAgent
 from pystyle import Colors, Colorate, Center
-import tkinter as tk
-from tkinter import messagebox
 from PIL import ImageTk, Image
 import webbrowser
 import threading
 from threading import Thread
 
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QMessageBox, QApplication
+import qdarkstyle
+
 # Logo.
-logo = """
-██╗  ██╗███████╗██╗   ██╗     ██████╗  ██████╗ ████████╗
-██║ ██╔╝██╔════╝╚██╗ ██╔╝     ██╔══██╗██╔═══██╗╚══██╔══╝
-█████╔╝ █████╗   ╚████╔╝█████╗██████╔╝██║   ██║   ██║   
-██╔═██╗ ██╔══╝    ╚██╔╝ ╚════╝██╔══██╗██║   ██║   ██║   
-██║  ██╗███████╗   ██║        ██████╔╝╚██████╔╝   ██║   
-╚═╝  ╚═╝╚══════╝   ╚═╝        ╚═════╝  ╚═════╝    ╚═╝   
-                                                        """
+logo = """𝐊𝐄𝐘-𝐁𝐎𝐓"""
+wersja = "0.1.2"
 
 # Default config file.
 default_config = """
@@ -38,7 +36,7 @@ ratelimit_sleep: 15
 clear = lambda: os.system("cls" if os.name in ("nt", "dos") else "clear")
 
 # Set the console title.
-os.system(f"title Keydrop Battle Bot - discord.gg/zV6MQQqkFV")
+os.system(f"title Key-Bot - discord.gg/zV6MQQqkFV")
 
 class Config:
     def __init__(self):
@@ -47,7 +45,7 @@ class Config:
             with open("konfig.yaml", "w") as file:
                 file.write(default_config)
             self.log_message("Plik konfiguracyjny stworzony! Uzupelnij go i zrestartuj bota.")
-            exit()
+            sys.exit()
 
         with open("konfig.yaml", "r") as file:
             self.config = yaml.load(file, Loader=SafeLoader)
@@ -82,8 +80,8 @@ class CaseBattle:
         self.ticket_cost_threshold = ticket_cost_threshold
 
     def print_logo(self):
-        self.log_message(Center.XCenter("────────────────────────────────────────────\n"))
-        self.log_message(Center.XCenter("Szukanie bitwy..."))
+        self.log_message('<span style="color: gold;">────────────────────────────────────────────\n</span>')
+        self.log_message("Szukanie bitwy...")
 
     def get_active_battles(self):
         try:
@@ -104,7 +102,7 @@ class CaseBattle:
             response.raise_for_status()
             data = json.loads(response.text)
             if data["success"]:
-                return True, "Udalo sie dolaczyc do bitwy!"
+                return True, f'<span style="color: green;">Udalo sie dolaczyc do bitwy!</span>'
             if data["errorCode"] == "slotUnavailable":
                 return False, "Bitwa jest pełna!"
             if data["errorCode"] == "rateLimited":
@@ -129,26 +127,31 @@ class CaseBattle:
             battles = self.get_active_battles()
             for battle in battles:
                 if self.is_joinable(battle):
-                    print(Colorate.Vertical(Colors.yellow_to_red, f"\n─────────────────[ {battle['id']} ]─────────────────\n\n", 1))
-                    self.log_message(f"proba dolaczenia do bitwy {battle['id']}...")
-                    print(Colorate.Horizontal(Colors.yellow_to_green, f"ID bitwy: {battle['id']}\n", 1))
+                    # ...
+                    self.log_message(f'''<span style="color: gold;">\n<b>─────────────────[ {battle['id']} ]─────────────────</b>\n\n</span>''')
+                    self.log_message(f'''Próba dołączenia do bitwy <span style="color: yellow;"> {battle['id']}</span>...''')
+                    self.log_message(f'''<span style="color: gold;">ID bitwy: {battle['id']}\n</span>''')
                     success, message = self.join_battle(battle["id"])
                     if success:
-                        self.log_message(message, Colors.green)
-                        print(Colorate.Horizontal(Colors.green, message))
+                        self.log_message(message)
                     elif message == "Invalid token!":
-                        self.log_message("Nieprawidlowy token bearer!", Colors.red)
-                        exit()
+                        self.log_message(f'<span style="color: red;">Nieprawidlowy token bearer!</span>')
+                        sys.exit()
                     elif message == "Ratelimited!":
-                        self.log_message("Ratelimited! Trzeba zwiekszyc czas wstrzymania, lub dodac proxy.", Colors.red)
-                        self.log_message("Wstrzymanie na 30 sekund...", Colors.yellow)
+                        self.log_message(f'<span style="color: yellow;">Ratelimited! Trzeba zwiekszyc czas wstrzymania, lub dodac proxy.</span>')
+                        self.log_message("Wstrzymanie na 30 sekund...")
                         sleep(30)
                     elif message == "You have to wait one day between free battles!":
-                        self.log_message("Musisz zaczekac 1 dzien przed ponownym dolaczaniem!", Colors.red)
-                        exit()
+                        self.log_message(f'<span style="color: yellow;">Musisz zaczekac 1 dzien przed ponownym dolaczaniem!</span>')
+                        sys.exit()
+                    elif message == "notEnoughtMoney":
+                        self.log_message(f'<span style="color: red;">Nie masz biletów by uczestniczyć w darmowych bitwach!</span>')
+                        sys.exit()
                     else:
-                        self.log_message(f"Nie udalo sie dolaczyc do bitwy! {message}", Colors.red)
+                        self.log_message(f'<span style="color: red;">Nie udalo sie dolaczyc do bitwy! {message}</span>')
                         sleep(self.sleep_interval)
+                    # Emit signal to update GUI
+                    self.update_gui.emit()
             sleep(self.sleep_interval)
 
     def stop_monitoring(self):
@@ -167,72 +170,109 @@ class CaseBattle:
 
     def log_message(self, message, color=Colors.yellow):
         gui.log_message(message, color)
+        self.update_gui.emit()
 
-class GUI:
+class GUI(QtCore.QObject):
+    startBotClicked = QtCore.pyqtSignal(str)
+    updateGUI = QtCore.pyqtSignal()
+
     def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("Keydrop Battle Bot")
-        self.window.geometry("900x480")
+        super().__init__()
+        self.case_battle = None
+        self.app = QtWidgets.QApplication(sys.argv)
+        self.window = QtWidgets.QMainWindow()
+        # Apply the black theme
+        self.app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
+        self.window.setWindowTitle("Key-Bot")
+        self.window.setGeometry(100, 100, 900, 480)
 
-        self.log_text = tk.Text(self.window, state=tk.DISABLED)
-        self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.central_widget = QtWidgets.QWidget(self.window)
+        self.window.setCentralWidget(self.central_widget)
 
-        self.token_label = tk.Label(self.window, text="Bearer Token:")
-        self.token_label.pack()
-        self.token_entry = tk.Entry(self.window, width=40)
-        self.token_entry.pack()
+        self.layout = QtWidgets.QVBoxLayout(self.central_widget)
 
-        self.button_frame = tk.Frame(self.window)
-        self.button_frame.pack()
+        self.log_text = QtWidgets.QPlainTextEdit(self.central_widget)
+        self.log_text.setReadOnly(True)
+        self.layout.addWidget(self.log_text)
 
-        self.start_button = tk.Button(self.button_frame, text="Start", command=self.start_bot)
-        self.start_button.pack(side=tk.LEFT)
+        self.token_label = QtWidgets.QLabel(self.central_widget)
+        self.token_label.setText("Bearer Token:")
+        self.layout.addWidget(self.token_label)
 
-        self.stop_button = tk.Button(self.button_frame, text="Stop", command=self.stop_bot, state=tk.DISABLED)
-        self.stop_button.pack(side=tk.RIGHT)
+        self.token_entry = QtWidgets.QLineEdit(self.central_widget)
+        self.layout.addWidget(self.token_entry)
 
-        self.window.protocol("WM_DELETE_WINDOW", self.close_window)
+        self.button_frame = QtWidgets.QFrame(self.central_widget)
+        self.layout.addWidget(self.button_frame)
 
-        # Wyświetlanie logo
-        self.log_message(Center.XCenter(logo))
-        self.log_message(Center.XCenter("Wersja 0.1.2"))
+        self.button_layout = QtWidgets.QHBoxLayout(self.button_frame)
+
+        self.start_button = QtWidgets.QPushButton("Start")
+        self.start_button.clicked.connect(self.start_bot)
+        self.button_layout.addWidget(self.start_button)
+
+        self.stop_button = QtWidgets.QPushButton("Stop")
+        self.stop_button.clicked.connect(self.stop_bot)
+        self.stop_button.setEnabled(False)
+        self.button_layout.addWidget(self.stop_button)
+
+        self.window.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.window.closeEvent = self.close_window
+
+        # Display logo
+        self.log_message(f'<span style="color: gold;"><h1><b>{logo}</b></h1></span>')
+        self.log_message(Center.XCenter('Program jest w pełni darmowy. jeśli chcesz wesprzeć moją pracę możesz użyć kodu <span style="color: gold;"><b> key-bot </b></span> podczas doładowywania salda na key-drop.com'))
 
     def start_bot(self):
-        bearer_token = self.token_entry.get().strip()
+        bearer_token = self.token_entry.text().strip()
         if bearer_token:
-            self.start_button.config(state=tk.DISABLED)
-            self.stop_button.config(state=tk.NORMAL)
-            self.token_entry.config(state=tk.DISABLED)
-            self.case_battle = CaseBattle(bearer_token)
-
-            monitor_thread = Thread(target=self.case_battle.monitor_battles, daemon=True)
-            monitor_thread.start()
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+            self.token_entry.setEnabled(False)
+            self.startBotClicked.emit(bearer_token)
+            self.updateGUI.connect(self.update_log_text)
+            self.timer = QtCore.QTimer(singleShot=True)
+            self.timer.timeout.connect(self.update_log_text)
+            self.timer.start(100)  # Update every 100 milliseconds
         else:
-            messagebox.showerror("Error", "Bearer Token nie może być pusty!")
+            QMessageBox.critical(self.window, "Error", "Bearer Token nie może być pusty!")
+        
+    def update_log_text(self):
+        self.log_text.viewport().repaint()
 
     def stop_bot(self):
-        self.start_button.config(state=tk.NORMAL)
-        self.stop_button.config(state=tk.DISABLED)
-        self.token_entry.config(state=tk.NORMAL)
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.token_entry.setEnabled(True)
 
-        if self.case_battle is not None:
-            self.case_battle.stop_monitoring()
+        if gui.case_battle is not None:
+            gui.case_battle.stop_monitoring()
 
-    def close_window(self):
-        if self.case_battle is not None and self.case_battle.running:
-            messagebox.showinfo("Warning", "Zatrzymaj bota przed wyłączeniem.")
-        else:
-            self.window.destroy()
+    def close_window(self, event):
+        if gui.case_battle is not None and gui.case_battle.running:
+            gui.case_battle.stop_monitoring()
+        QtWidgets.QApplication.quit()
 
     def log_message(self, message, color=Colors.yellow):
-        self.log_text.config(state=tk.NORMAL)
-        self.log_text.insert(tk.END, message + "\n", color)
-        self.log_text.config(state=tk.DISABLED)
-        self.log_text.see(tk.END)
+        self.log_text.appendHtml(f'<span style="color: {color};">{message}</span>')
+        self.log_text.repaint()
+        self.log_text.update()
+        QtWidgets.QApplication.processEvents()
 
     def run(self):
-        self.window.mainloop()
+        self.window.show()
+        sys.exit(self.app.exec_())
 
+def start_case_battle(token):
+    case_battle = CaseBattle(token)
+    gui.case_battle = case_battle
+    case_battle.update_gui = gui.updateGUI
+    gui.updateGUI.connect(gui.update_log_text)
+
+    thread = threading.Thread(target=case_battle.monitor_battles)
+    thread.daemon = True
+    thread.start()
 
 gui = GUI()
+gui.startBotClicked.connect(start_case_battle)
 gui.run()
