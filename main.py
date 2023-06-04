@@ -4,6 +4,7 @@ import os
 import requests
 import logging
 import yaml
+import time
 from time import sleep
 from datetime import datetime, timedelta
 from yaml import SafeLoader
@@ -16,10 +17,12 @@ from functools import partial
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMessageBox, QApplication
 import qdarkstyle
+import pyperclip
+import pyautogui
 
 # Logo.
 logo = """𝐊𝐄𝐘-𝐁𝐎𝐓"""
-wersja = "0.1.2"
+wersja = "0.1.3"
 
 # Default config file.
 default_config = """
@@ -116,6 +119,11 @@ class GUI(QtCore.QObject):
         self.stop_button.setStyleSheet(stop_style + "background-color: #22FF1111; border: 1px solid #FF0000; padding: 5px;")
         self.button_layout.addWidget(self.stop_button)
 
+        self.get_bt_button = QtWidgets.QPushButton("🔑 Pobierz swój BT")
+        self.get_bt_button.clicked.connect(self.get_bearer_token)
+        self.get_bt_button.setStyleSheet(link_style + "background-color: #22FFFF11; border: 1px solid #FFFF00; padding: 5px;")
+        self.button_layout.addWidget(self.get_bt_button)
+
         # Linki
         self.links_frame = QtWidgets.QFrame(self.central_widget)
         self.layout.addWidget(self.links_frame)
@@ -152,6 +160,65 @@ class GUI(QtCore.QObject):
         # Display logo
         self.log_message(f'<span style="color: gold;"><h1><b>{logo}</b></h1></span>')
         self.log_message('Program jest w pełni darmowy. Jeśli chcesz wesprzeć moją pracę możesz użyć kodu <span style="color: gold;"><b> key-bot </b></span> podczas doładowywania salda na key-drop.com')
+
+    def get_bearer_token(self):
+        QMessageBox.information(
+            self.window,
+            "Informacja",
+            "(Sposób przetestowany na microsoft edge na innych może nie działać) \n"
+            "Pobierzemy teraz twój bearer token. \n"
+            "Nie dotykaj niczego póki nie wyświetli się kolejny komunikat. \n"
+            "Ten proces zajmie około 30 sekund. \n"
+            "Kliknij OK jeśli rozumiesz."
+        )
+        # Otwórz stronę key-drop.com
+        webbrowser.open("https://key-drop.com")
+        sleep(10)
+        pyautogui.hotkey("F12")
+        sleep(2)
+        # Przełącz na zakładkę Network w konsoli deweloperskiej
+        pyautogui.keyDown("ctrl")
+        pyautogui.keyDown("shift")
+        pyautogui.press("p")
+        pyautogui.keyUp("shift")
+        pyautogui.keyUp("ctrl")
+        pyautogui.keyUp("p")
+        time.sleep(1)
+        pyautogui.typewrite("Network")
+        time.sleep(1)
+        pyautogui.hotkey("Enter")
+        pyautogui.hotkey("F5")
+        time.sleep(8)
+        pyautogui.keyDown("Ctrl")
+        pyautogui.press("f")
+        pyautogui.keyUp("Ctrl")
+        time.sleep(1)
+        pyautogui.typewrite("authorization:")
+        pyautogui.hotkey("Enter")
+        pyautogui.press("TAB")
+        pyautogui.press("TAB")
+        pyautogui.press("TAB")
+        pyautogui.press("down")
+        pyautogui.hotkey("Enter")
+        pyautogui.keyDown("Alt")
+        pyautogui.press("TAB")
+        pyautogui.keyUp("Alt")
+
+        # Tutaj powinniśmy skopiować Bearer token, ale nie wiem jak to zrobić :(
+
+        QMessageBox.information(
+            self.window,
+            "Informacja",
+            "Proces zakończony.\n"
+            "Skopiuj teraz swój bearer token.\n"
+            "Po skopiowaniu naciśnij OK.\n"
+            "Token powinien się wkleić automatycnie w odpowiednie pole"
+        )
+
+        clipboard_token = pyperclip.paste()
+        if clipboard_token:
+            self.token_entry.setText(clipboard_token)
+
 
     def start_bot(self):
         bearer_token = self.token_entry.text().strip()
