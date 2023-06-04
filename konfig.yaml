@@ -1,5 +1,0 @@
-# Keydrop Bot Config
-bearer_token: "Bearer ID"
-sleep_interval: 1
-ticket_cost_threshold: 1000
-ratelimit_sleep: 25
